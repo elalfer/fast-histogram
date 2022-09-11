@@ -117,28 +117,28 @@ static void BenchByteHistogram(benchmark::State& state) {
   uint32_t h[256];
   for (auto _ : state) {
     memset(h, 0, 256 * sizeof(uint32_t));
-    ByteHistogram(h, dataBuf, SIZE);
+    ByteHistogram(h, dataBuf, state.range(0));
   }
 }
-BENCHMARK(BenchByteHistogram);
+BENCHMARK(BenchByteHistogram)->Range(8, SIZE);
 
 static void BenchByteHistogramX4(benchmark::State& state) {
   uint32_t h[256 * 4];
   for (auto _ : state) {
     memset(h, 0, 256 * 4 * sizeof(uint32_t));
-    ByteHistogramX4(h, dataBuf, SIZE);
+    ByteHistogramX4(h, dataBuf, state.range(0));
   }
 }
-BENCHMARK(BenchByteHistogramX4);
+BENCHMARK(BenchByteHistogramX4)->Range(8, SIZE);
 
 static void BenchByteHistogramLong16(benchmark::State& state) {
   uint32_t h[256];
   for (auto _ : state) {
     memset(h, 0, 256 * sizeof(uint32_t));
-    ByteHistogramLong<16>(h, dataBuf, SIZE);
+    ByteHistogramLong<16>(h, dataBuf, state.range(0));
   }
 }
-BENCHMARK(BenchByteHistogramLong16);
+BENCHMARK(BenchByteHistogramLong16)->Range(8, SIZE);
 
 // Unittests
 
