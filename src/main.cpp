@@ -74,26 +74,26 @@ void ByteHistogramLong(uint32_t* out, const unsigned char* buf, size_t len) {
     // Shouldn't happen more often than 1/64K only when all values are the same
   }
 
-  for (; i < len; i++) {
-    out[buf[i]]++;
-  }
 
   // Merge histograms using AVX2
   // 1. Sum by 256
   for (int i = 0; i < 256; i += 8) {
 
-    auto v = _mm256_setzero_si256();
-    for (int k = 0; k < bucketsCnt; k += 256) {
+    auto v0 = _mm256_setzero_si256();
+    auto v1 = _mm256_setzero_si256();
+    for (int k = 0; k < bucketsCnt; k += 512) {
       auto d = LOAD_TMP(i + k); 
-      v = _mm256_add_epi32(v, d);
+      v0 = _mm256_add_epi32(v0, d);
+      d = LOAD_TMP(i + k + 256); 
+      v1 = _mm256_add_epi32(v1, d);
     }
-    v = _mm256_add_epi32(v, _mm256_loadu_si256((__m256i_u*)&out[i]));
-    _mm256_storeu_si256((__m256i_u*)&out[i], v);
+    v0 = _mm256_add_epi32(v0, v1);
+    _mm256_storeu_si256((__m256i_u*)&out[i], v0);
   }
 
   // 2. Horizontal sum by 256 element slices
   for (int i = 0; i < 256; i++) {
-    //   Unroll by 2 to accumulate dep chain and use 2 loads per cycle
+    // Unroll by 2 to accumulate dep chain and use 2 loads per cycle
     auto v0 = LOAD_TMP(i * 256);
     auto v1 = LOAD_TMP(i * 256 + 8);
     for (int k = 16; k < 256; k += 16) {
@@ -102,12 +102,15 @@ void ByteHistogramLong(uint32_t* out, const unsigned char* buf, size_t len) {
     }
     v0 = _mm256_add_epi32(v0, v1);
 
-    // FIXME vector horizontal sum
-    uint32_t t[8];
-    _mm256_storeu_si256((__m256i_u*)t, v0);
-    for (int k = 0; k < 8; k++) {
-      out[i] += t[k];
-    }
+    __m128i r = _mm_add_epi32(_mm256_castsi256_si128(v0), _mm256_extracti128_si256(v0, 1));
+    r = _mm_add_epi32(r, _mm_srli_si128(r, 2 * sizeof(uint32_t)));
+    r = _mm_add_epi32(r, _mm_srli_si128(r, 1 * sizeof(uint32_t)));
+    out[i] += _mm_cvtsi128_si32(r);
+  }
+
+  // Add last byte if len is odd
+  if (len % 1) {
+    out[buf[len - 1]]++;
   }
 }
 
