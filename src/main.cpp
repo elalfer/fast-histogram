@@ -50,6 +50,42 @@ void ByteHistogramX4(uint32_t *out, const unsigned char *buf, size_t len) {
   }
 }
 
+void ByteHistogramX256(uint32_t *out, const unsigned char *buf, size_t len) {
+  uint16_t t[256][256];
+  memset(t, 0, sizeof t);
+  size_t i = 0;
+  for (; i < (len & (~255)); i += 256) {
+#pragma unroll(32)
+    for (int k = 0; k < 256; k++) {
+      t[k][buf[i+k]]++;
+    }
+  }
+  
+  // Aggregate
+  for (int k = 0; k < 256; k += 8) {
+
+#if 1
+    __m256i s = _mm256_setzero_si256();
+    for (int l = 0; l < 256; l++) {
+      auto tmp = _mm256_cvtepu16_epi32(_mm_loadu_si128((__m128i_u*)&t[l][k]));
+      s = _mm256_add_epi32(s, tmp);
+    }
+    _mm256_storeu_si256((__m256i_u*)&out[k], s);
+#else
+
+    uint32_t s = 0;
+    for (int l = 0; l < 256; l++) {
+      s += t[l][k];
+    }
+    out[k] = s;
+#endif
+
+  }
+  for (; i < len; i++) {
+    out[buf[i]]++;
+  }
+}
+
 template <int BITS=16, typename BUCKET_TYPE=uint16_t>
 void ByteHistogramLong(uint32_t* out, const unsigned char* buf, size_t len) {
   using histo_int_t = BUCKET_TYPE;
@@ -62,18 +98,59 @@ void ByteHistogramLong(uint32_t* out, const unsigned char* buf, size_t len) {
 
   // Create 32bit histogram
   size_t i = 0;
-  for (; i < (len & ~1); i += 2) {
+  uint16_t tv;
 
-    // TODO bench RMW on BDW/SKL
-    hT[*((uint16_t*)&buf[i])]++;
+  // #pragma unroll(4)
+  for (; i < (len & ~7); i += 2 * 4) {
+#if 0
+    tv = *((uint16_t*)&buf[i + 0]);
+    hT[tv]++;
+    tv = *((uint16_t*)&buf[i + 2]);
+    hT[tv]++;
+    tv = *((uint16_t*)&buf[i + 4]);
+    hT[tv]++;
+    tv = *((uint16_t*)&buf[i + 6]);
+    hT[tv]++;
+#else
+    // "addw $0x1, (%[histo], %[value], 2)\n\t"
+    asm goto(
 
-
+        "movzwl (%[inp], %[i], 1), %%ecx\n\t"
+        "incw (%[histo], %%rcx, 2)\n\t"
+        "jo %l[flush]\n\t"
+        "movzwl 2(%[inp], %[i], 1), %%ecx\n\t"
+        "incw (%[histo], %%rcx, 2)\n\t"
+        "jo %l[flush]\n\t"
+        "movzwl 4(%[inp], %[i], 1), %%ecx\n\t"
+        "incw (%[histo], %%rcx, 2)\n\t"
+        "jo %l[flush]\n\t"
+        "movzwl 6(%[inp], %[i], 1), %%ecx\n\t"
+        "incw (%[histo], %%rcx, 2)\n\t"
+        "jo %l[flush]\n\t"
+        :
+        : /* [value]"r"((uint64_t)tv), */ [histo]"r"(hT),
+          [inp]"r"(buf), [i]"r"(i)
+        : "rcx"
+        : flush
+        );
+#endif
+    back:
+      ;
     // flush temp storage on overflow flag only if accumulator is < 32bit
     // should be very uncommon situation for more or less
     // evenly distributed values 
     // Shouldn't happen more often than 1/64K only when all values are the same
   }
 
+goto done;
+
+flush:
+  // Increment corresponding buckets
+  out[i & 0xFF]++;
+  out[(i >> 8) & 0xFF]++;
+  goto back;
+
+done:
 
   // Merge histograms using AVX2
   // 1. Sum by 256
@@ -88,6 +165,7 @@ void ByteHistogramLong(uint32_t* out, const unsigned char* buf, size_t len) {
       v1 = _mm256_add_epi32(v1, d);
     }
     v0 = _mm256_add_epi32(v0, v1);
+    // FIXME merge result with out (may be set by overflow path)
     _mm256_storeu_si256((__m256i_u*)&out[i], v0);
   }
 
@@ -109,7 +187,7 @@ void ByteHistogramLong(uint32_t* out, const unsigned char* buf, size_t len) {
   }
 
   // Add last byte if len is odd
-  if (len % 1) {
+  for(; i < len; i++) {
     out[buf[len - 1]]++;
   }
 }
@@ -134,6 +212,14 @@ static void BenchByteHistogramX4(benchmark::State& state) {
 }
 BENCHMARK(BenchByteHistogramX4)->Range(8, SIZE);
 
+static void BenchByteHistogramX256(benchmark::State& state) {
+  uint32_t h[256];
+  for (auto _ : state) {
+    ByteHistogramX256(h, dataBuf, state.range(0));
+  }
+}
+BENCHMARK(BenchByteHistogramX256)->Range(8, SIZE);
+
 static void BenchByteHistogramLong16(benchmark::State& state) {
   uint32_t h[256];
   for (auto _ : state) {
@@ -155,6 +241,16 @@ TEST(Histogram, X4) {
   EXPECT_EQ(memcmp(hOrig, hX4, 256*sizeof(uint32_t)), 0);
 }
 
+TEST(Histogram, X256) {
+  uint32_t hOrig[256] = {0};
+  uint32_t hX256[256] = {0};
+
+  ByteHistogram(hOrig, dataBuf, SIZE);
+  ByteHistogramX256(hX256, dataBuf, SIZE);
+
+  EXPECT_EQ(memcmp(hOrig, hX256, 256*sizeof(uint32_t)), 0);
+}
+
 TEST(Histogram, Long16) {
   uint32_t hOrig[256] = {0};
   uint32_t hLong16[256] = {0};
@@ -165,11 +261,14 @@ TEST(Histogram, Long16) {
   EXPECT_EQ(memcmp(hOrig, hLong16, 256*sizeof(uint32_t)), 0);
 }
 
+// BENCHMARK_MAIN();
+
+
 int main(int argc, char **argv) {
   ::testing::InitGoogleTest(&argc, argv);
   auto test_res = RUN_ALL_TESTS();
   if (test_res != 0) {
-    return test_res;
+    // return test_res;
   }
 
   ::benchmark::Initialize(&argc, argv);

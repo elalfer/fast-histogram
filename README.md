@@ -1,4 +1,5 @@
 # fast-histogram
+
 Fast byte histogram
 
 ## Benchmark results
