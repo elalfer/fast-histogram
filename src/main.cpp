@@ -86,71 +86,66 @@ void ByteHistogramX256(uint32_t *out, const unsigned char *buf, size_t len) {
   }
 }
 
-template <int BITS=16, typename BUCKET_TYPE=uint16_t>
+template <int BITS=16, typename BUCKET_TYPE=uint8_t>
 void ByteHistogramLong(uint32_t* out, const unsigned char* buf, size_t len) {
   using histo_int_t = BUCKET_TYPE;
   constexpr int bucketsCnt = 1 << BITS;
   histo_int_t hT[bucketsCnt] = {0};
 
-  // #define LOAD_TMP(idx) _mm256_cvtepu8_epi32(_mm_cvtsi64_si128(*((uint64_t*)&hT[(idx)])))
-  #define LOAD_TMP(idx) _mm256_cvtepu16_epi32(_mm_loadu_si128((__m128i_u*)&hT[(idx)]))
-  // #define LOAD_TMP(idx) _mm256_loadu_si256((__m256i_u*)&hT[idx])
-
   // Create 32bit histogram
-  size_t i = 0;
+  size_t k = 0;
   uint16_t tv;
 
-  // #pragma unroll(4)
-  for (; i < (len & ~7); i += 2 * 4) {
-#if 0
-    tv = *((uint16_t*)&buf[i + 0]);
-    hT[tv]++;
-    tv = *((uint16_t*)&buf[i + 2]);
-    hT[tv]++;
-    tv = *((uint16_t*)&buf[i + 4]);
-    hT[tv]++;
-    tv = *((uint16_t*)&buf[i + 6]);
-    hT[tv]++;
-#else
-    // "addw $0x1, (%[histo], %[value], 2)\n\t"
-    asm goto(
+  for (; k < (len & ~7); k += 2 * 4) {
+    #define STORE_16BIT \
+        "  movq %%rcx, %%rbx\n\t" \
+        "  andq $0xFF, %%rbx\n\t" \
+        "  addq $256, (%[out], %%rbx, 4)\n\t" \
+        "  shrq $8, %%rcx\n\t" \
+        "  addq $256, (%[out], %%rcx, 4)\n\t"
 
-        "movzwl (%[inp], %[i], 1), %%ecx\n\t"
-        "incw (%[histo], %%rcx, 2)\n\t"
-        "jo %l[flush]\n\t"
-        "movzwl 2(%[inp], %[i], 1), %%ecx\n\t"
-        "incw (%[histo], %%rcx, 2)\n\t"
-        "jo %l[flush]\n\t"
-        "movzwl 4(%[inp], %[i], 1), %%ecx\n\t"
-        "incw (%[histo], %%rcx, 2)\n\t"
-        "jo %l[flush]\n\t"
-        "movzwl 6(%[inp], %[i], 1), %%ecx\n\t"
-        "incw (%[histo], %%rcx, 2)\n\t"
-        "jo %l[flush]\n\t"
+    asm volatile(
+        "  movzwq (%[inp], %[i], 1), %%rcx\n\t"
+        "  addb $1, (%[histo], %%rcx, 1)\n\t"
+        "  jc flush_0\n\t"
+        "inc_0:"
+        "  movzwq 2(%[inp], %[i], 1), %%rcx\n\t"
+        "  addb $1, (%[histo], %%rcx, 1)\n\t"
+        "  jc flush_1\n\t"
+        "inc_1:"
+        "  movzwq 4(%[inp], %[i], 1), %%rcx\n\t"
+        "  addb $1, (%[histo], %%rcx, 1)\n\t"
+        "  jc flush_2\n\t"
+        "inc_2:"
+        "  movzwq 6(%[inp], %[i], 1), %%rcx\n\t"
+        "  addb $1, (%[histo], %%rcx, 1)\n\t"
+        "  jc flush_3\n\t"
+        
+        "jmp end_loop\n\t"
+
+        "flush_0:\n\t"
+        STORE_16BIT
+        "  jmp inc_0\n\t"
+        "flush_1:\n\t"
+        STORE_16BIT
+        "  jmp inc_1\n\t"
+        "flush_2:\n\t"
+        STORE_16BIT
+        "  jmp inc_2\n\t"
+        "flush_3:\n\t"
+        STORE_16BIT
+
+        "end_loop:\n\t"
         :
-        : /* [value]"r"((uint64_t)tv), */ [histo]"r"(hT),
-          [inp]"r"(buf), [i]"r"(i)
-        : "rcx"
-        : flush
+        : [histo]"r"(hT), [out]"r"(out),
+          [inp]"r"(buf), [i]"r"(k)
+        : "rbx", "rcx"
         );
-#endif
-    back:
-      ;
-    // flush temp storage on overflow flag only if accumulator is < 32bit
-    // should be very uncommon situation for more or less
-    // evenly distributed values 
-    // Shouldn't happen more often than 1/64K only when all values are the same
   }
 
-goto done;
-
-flush:
-  // Increment corresponding buckets
-  out[i & 0xFF]++;
-  out[(i >> 8) & 0xFF]++;
-  goto back;
-
-done:
+  #define LOAD_TMP(idx) _mm256_cvtepu8_epi32(_mm_cvtsi64_si128(*((uint64_t*)&hT[(idx)])))
+  // #define LOAD_TMP(idx) _mm256_cvtepu16_epi32(_mm_loadu_si128((__m128i_u*)&hT[(idx)]))
+  // #define LOAD_TMP(idx) _mm256_loadu_si256((__m256i_u*)&hT[idx])
 
   // Merge histograms using AVX2
   // 1. Sum by 256
@@ -165,8 +160,8 @@ done:
       v1 = _mm256_add_epi32(v1, d);
     }
     v0 = _mm256_add_epi32(v0, v1);
-    // FIXME merge result with out (may be set by overflow path)
-    _mm256_storeu_si256((__m256i_u*)&out[i], v0);
+    _mm256_storeu_si256((__m256i_u*)&out[i], 
+      _mm256_add_epi32(_mm256_loadu_si256((__m256i_u*)&out[i]), v0));
   }
 
   // 2. Horizontal sum by 256 element slices
@@ -186,9 +181,9 @@ done:
     out[i] += _mm_cvtsi128_si32(r);
   }
 
-  // Add last byte if len is odd
-  for(; i < len; i++) {
-    out[buf[len - 1]]++;
+  // Add last few bytes
+  for(; k < len; k++) {
+    out[buf[k]]++;
   }
 }
 
@@ -258,11 +253,12 @@ TEST(Histogram, Long16) {
   ByteHistogram(hOrig, dataBuf, SIZE);
   ByteHistogramLong<16>(hLong16, dataBuf, SIZE);
 
-  EXPECT_EQ(memcmp(hOrig, hLong16, 256*sizeof(uint32_t)), 0);
+  for (int i = 0; i < 256; i++) {
+    EXPECT_EQ(hOrig[i], hLong16[i]);
+  }
 }
 
 // BENCHMARK_MAIN();
-
 
 int main(int argc, char **argv) {
   ::testing::InitGoogleTest(&argc, argv);

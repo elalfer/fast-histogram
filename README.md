@@ -9,33 +9,33 @@ Intel(R) Core(TM) i7-8565U CPU
 ---------------------------------------------------------------------------
 Benchmark                                 Time             CPU   Iterations
 ---------------------------------------------------------------------------
-BenchByteHistogram/8                   12.1 ns         12.1 ns     56274842
-BenchByteHistogram/64                  36.8 ns         36.7 ns     19317236
-BenchByteHistogram/512                  219 ns          219 ns      3168641
-BenchByteHistogram/4096                1735 ns         1731 ns       404671
-BenchByteHistogram/32768              13923 ns        13857 ns        49346
-BenchByteHistogram/262144            130991 ns       129016 ns         6317
-BenchByteHistogram/1048576           442646 ns       441199 ns         1146
-BenchByteHistogramX4/8                 83.7 ns         83.6 ns      7938830
-BenchByteHistogramX4/64                 113 ns          112 ns      6118909
-BenchByteHistogramX4/512                273 ns          273 ns      2530391
-BenchByteHistogramX4/4096              1594 ns         1590 ns       402642
-BenchByteHistogramX4/32768            11514 ns        11495 ns        58348
-BenchByteHistogramX4/262144           93960 ns        93782 ns         7095
-BenchByteHistogramX4/1048576         373906 ns       373100 ns         1815
-BenchByteHistogramX256/8               8627 ns         8521 ns        85375
-BenchByteHistogramX256/64              7673 ns         7655 ns        85675
-BenchByteHistogramX256/512             7948 ns         7934 ns        83007
-BenchByteHistogramX256/4096            9369 ns         9352 ns        70914
-BenchByteHistogramX256/32768          20884 ns        20844 ns        32526
-BenchByteHistogramX256/262144        114592 ns       114361 ns         5896
-BenchByteHistogramX256/1048576       427258 ns       426362 ns         1399
-BenchByteHistogramLong16/8             9839 ns         9819 ns        67036
-BenchByteHistogramLong16/64            9773 ns         9754 ns        68221
-BenchByteHistogramLong16/512           9888 ns         9869 ns        67197
-BenchByteHistogramLong16/4096         10743 ns        10712 ns        62444
-BenchByteHistogramLong16/32768        16080 ns        16048 ns        42140
-BenchByteHistogramLong16/262144       61766 ns        61644 ns        10160
-BenchByteHistogramLong16/1048576     218389 ns       217952 ns         3083
+BenchByteHistogram/8                   10.2 ns         10.1 ns     68690175
+BenchByteHistogram/64                  29.7 ns         29.7 ns     23657317
+BenchByteHistogram/512                  216 ns          216 ns      3242727
+BenchByteHistogram/4096                1712 ns         1709 ns       409052
+BenchByteHistogram/32768              13663 ns        13641 ns        50530
+BenchByteHistogram/262144            109077 ns       108892 ns         6336
+BenchByteHistogram/1048576           434907 ns       434135 ns         1600
+BenchByteHistogramX4/8                 55.5 ns         55.4 ns     12319216
+BenchByteHistogramX4/64                73.7 ns         73.6 ns      9417606
+BenchByteHistogramX4/512                235 ns          234 ns      2991075
+BenchByteHistogramX4/4096              1533 ns         1531 ns       455040
+BenchByteHistogramX4/32768            11720 ns        11702 ns        59421
+BenchByteHistogramX4/262144           92725 ns        92562 ns         7460
+BenchByteHistogramX4/1048576         370919 ns       370262 ns         1883
+BenchByteHistogramX256/8               6803 ns         6793 ns        98161
+BenchByteHistogramX256/64              6834 ns         6822 ns        96928
+BenchByteHistogramX256/512             7114 ns         7102 ns        92994
+BenchByteHistogramX256/4096            8691 ns         8676 ns        76535
+BenchByteHistogramX256/32768          20304 ns        20270 ns        34312
+BenchByteHistogramX256/262144        114545 ns       114326 ns         6044
+BenchByteHistogramX256/1048576       432834 ns       432031 ns         1628
+BenchByteHistogramLong16/8             8758 ns         8744 ns        78074
+BenchByteHistogramLong16/64            8835 ns         8820 ns        77006
+BenchByteHistogramLong16/512           8946 ns         8930 ns        76350
+BenchByteHistogramLong16/4096          9595 ns         9580 ns        73043
+BenchByteHistogramLong16/32768        15073 ns        15049 ns        46182
+BenchByteHistogramLong16/262144       65295 ns        65181 ns        10288
+BenchByteHistogramLong16/1048576     235049 ns       234631 ns         2961
 ```
 
