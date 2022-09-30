@@ -2,7 +2,7 @@
 
 Fast byte histogram
 
-## Benchmark results
+## Random benchmark results
 
 ```
 Intel(R) Core(TM) i7-8565U CPU
@@ -39,3 +39,6 @@ BenchByteHistogramLong16/262144       65295 ns        65181 ns        10288
 BenchByteHistogramLong16/1048576     235049 ns       234631 ns         2961
 ```
 
+## Standard inputs
+
+![](perf.png)

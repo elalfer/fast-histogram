@@ -1,11 +1,12 @@
 #include <array>
 #include <iostream>
+#include <fstream>
 #include <immintrin.h>
 #include <benchmark/benchmark.h>
 
 #include <gtest/gtest.h>
 
-#define SIZE (1024 * 1024)
+static size_t SIZE = (1024 * 1024);
 
 unsigned char* genRandBuffer(size_t size) {
   unsigned char* buf = (unsigned char*) malloc(SIZE);
@@ -193,36 +194,36 @@ static void BenchByteHistogram(benchmark::State& state) {
   uint32_t h[256];
   for (auto _ : state) {
     memset(h, 0, 256 * sizeof(uint32_t));
-    ByteHistogram(h, dataBuf, state.range(0));
+    ByteHistogram(h, dataBuf, SIZE /*state.range(0)*/);
   }
 }
-BENCHMARK(BenchByteHistogram)->Range(8, SIZE);
+BENCHMARK(BenchByteHistogram); //->Range(8, SIZE);
 
 static void BenchByteHistogramX4(benchmark::State& state) {
   uint32_t h[256 * 4];
   for (auto _ : state) {
     memset(h, 0, 256 * 4 * sizeof(uint32_t));
-    ByteHistogramX4(h, dataBuf, state.range(0));
+    ByteHistogramX4(h, dataBuf, SIZE);
   }
 }
-BENCHMARK(BenchByteHistogramX4)->Range(8, SIZE);
+BENCHMARK(BenchByteHistogramX4); //->Range(8, SIZE);
 
 static void BenchByteHistogramX256(benchmark::State& state) {
   uint32_t h[256];
   for (auto _ : state) {
-    ByteHistogramX256(h, dataBuf, state.range(0));
+    ByteHistogramX256(h, dataBuf, SIZE);
   }
 }
-BENCHMARK(BenchByteHistogramX256)->Range(8, SIZE);
+BENCHMARK(BenchByteHistogramX256); //->Range(8, SIZE);
 
 static void BenchByteHistogramLong16(benchmark::State& state) {
   uint32_t h[256];
   for (auto _ : state) {
     memset(h, 0, 256 * sizeof(uint32_t));
-    ByteHistogramLong<16>(h, dataBuf, state.range(0));
+    ByteHistogramLong<16>(h, dataBuf, SIZE);
   }
 }
-BENCHMARK(BenchByteHistogramLong16)->Range(8, SIZE);
+BENCHMARK(BenchByteHistogramLong16); //->Range(8, SIZE);
 
 // Unittests
 
@@ -261,11 +262,23 @@ TEST(Histogram, Long16) {
 // BENCHMARK_MAIN();
 
 int main(int argc, char **argv) {
-  ::testing::InitGoogleTest(&argc, argv);
+
+  // Read file and replace data buffer with it
+  if (argc > 1) {
+    free((void *)dataBuf);
+    std::ifstream t(std::string{argv[1]});
+    static std::stringstream buffer;
+    buffer << t.rdbuf();
+    static std::string dataStr = buffer.str();
+    SIZE = dataStr.size();
+    dataBuf = (const unsigned char *)dataStr.c_str();
+  }
+
+  /*::testing::InitGoogleTest(&argc, argv);
   auto test_res = RUN_ALL_TESTS();
   if (test_res != 0) {
-    // return test_res;
-  }
+    return test_res;
+  }*/
 
   ::benchmark::Initialize(&argc, argv);
   ::benchmark::RunSpecifiedBenchmarks();
