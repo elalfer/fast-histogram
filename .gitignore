@@ -1,3 +1,6 @@
+# Artifact dirs
+./bin
+
 # Prerequisites
 *.d
 
