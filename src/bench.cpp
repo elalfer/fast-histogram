@@ -7,6 +7,8 @@
 
 #include <benchmark/benchmark.h>
 
+using namespace fast_histogram;
+
 static size_t SIZE = (1024 * 1024);
 
 unsigned char* genRandBuffer(size_t size) {
@@ -28,7 +30,7 @@ static void BenchByteHistogram(benchmark::State& state) {
     ByteHistogram(h, dataBuf, SIZE /*state.range(0)*/);
   }
 }
-// BENCHMARK(BenchByteHistogram); //->Range(8, SIZE);
+BENCHMARK(BenchByteHistogram); //->Range(8, SIZE);
 
 static void BenchByteHistogramX4(benchmark::State& state) {
   uint32_t h[256 * 4];
@@ -37,7 +39,7 @@ static void BenchByteHistogramX4(benchmark::State& state) {
     ByteHistogramX4(h, dataBuf, SIZE);
   }
 }
-// BENCHMARK(BenchByteHistogramX4); //->Range(8, SIZE);
+BENCHMARK(BenchByteHistogramX4); //->Range(8, SIZE);
 
 static void BenchByteHistogramX256(benchmark::State& state) {
   uint32_t h[256];
@@ -45,7 +47,7 @@ static void BenchByteHistogramX256(benchmark::State& state) {
     ByteHistogramX256(h, dataBuf, SIZE);
   }
 }
-// BENCHMARK(BenchByteHistogramX256); //->Range(8, SIZE);
+BENCHMARK(BenchByteHistogramX256); //->Range(8, SIZE);
 
 static void BenchByteHistogramLong16(benchmark::State& state) {
   uint32_t h[256];
