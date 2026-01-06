@@ -1,11 +1,12 @@
-#include <fast_histogram.h>
-
 #include <array>
 #include <iostream>
 #include <fstream>
+#include <filesystem>
 #include <sstream>
 
 #include <benchmark/benchmark.h>
+
+#include <fast_histogram.h>
 
 using namespace fast_histogram;
 
@@ -49,6 +50,8 @@ static void BenchByteHistogramX256(benchmark::State& state) {
 }
 BENCHMARK(BenchByteHistogramX256); //->Range(8, SIZE);
 
+#ifdef __AVX2__
+
 static void BenchByteHistogramLong16(benchmark::State& state) {
   uint32_t h[256];
   for (auto _ : state) {
@@ -58,52 +61,27 @@ static void BenchByteHistogramLong16(benchmark::State& state) {
 }
 BENCHMARK(BenchByteHistogramLong16); //->Range(8, SIZE);
 
-// Unittests
-#if 0
-
-TEST(Histogram, X4) {
-  uint32_t hOrig[256] = {0};
-  uint32_t hX4[256 * 4] = {0};
-
-  ByteHistogram(hOrig, dataBuf, SIZE);
-  ByteHistogramX4(hX4, dataBuf, SIZE);
-
-  EXPECT_EQ(memcmp(hOrig, hX4, 256*sizeof(uint32_t)), 0);
-}
-
-TEST(Histogram, X256) {
-  uint32_t hOrig[256] = {0};
-  uint32_t hX256[256] = {0};
-
-  ByteHistogram(hOrig, dataBuf, SIZE);
-  ByteHistogramX256(hX256, dataBuf, SIZE);
-
-  EXPECT_EQ(memcmp(hOrig, hX256, 256*sizeof(uint32_t)), 0);
-}
-
-TEST(Histogram, Long16) {
-  uint32_t hOrig[256] = {0};
-  uint32_t hLong16[256] = {0};
-
-  ByteHistogram(hOrig, dataBuf, SIZE);
-  ByteHistogramLong<16>(hLong16, dataBuf, SIZE);
-
-  for (int i = 0; i < 256; i++) {
-    EXPECT_EQ(hOrig[i], hLong16[i]);
-  }
-}
-
-#endif
+#endif // __AVX2__
 
 int main(int argc, char **argv) {
   if (argc > 1) {
+    const auto fname = std::string{argv[1]};
+    if (!std::filesystem::exists(fname)) {
+      std::cerr << "ERROR: Input file does not exist\n";
+      return 1;
+    }
+
+    std::cout << "Reading file: " << fname << std::endl;
+
     // Read file and replace data buffer with it
-    std::ifstream t(std::string{argv[1]});
+    std::ifstream t(fname);
     std::stringstream buffer;
     buffer << t.rdbuf();
 
     static std::string dataStr = buffer.str();
     SIZE = dataStr.size();
+
+    std::cout << "Input size: " << SIZE << std::endl;
 
     dataBuf = (const unsigned char *)dataStr.c_str();
   } else {

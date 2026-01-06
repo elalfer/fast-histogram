@@ -79,7 +79,9 @@ namespace fast_histogram {
     }
   }
   
-  // 
+#ifdef __AVX2__
+
+  // Byte histogram using intermidiate 16bit histogram accumulation
   template <int BITS=16, typename BUCKET_TYPE=uint8_t>
   void ByteHistogramLong(uint32_t* out, const unsigned char* buf, size_t len) {
     using histo_int_t = BUCKET_TYPE;
@@ -138,8 +140,6 @@ namespace fast_histogram {
     }
   
     #define LOAD_TMP(idx) _mm256_cvtepu8_epi32(_mm_cvtsi64_si128(*((uint64_t*)&hT[(idx)])))
-    // #define LOAD_TMP(idx) _mm256_cvtepu16_epi32(_mm_loadu_si128((__m128i_u*)&hT[(idx)]))
-    // #define LOAD_TMP(idx) _mm256_loadu_si256((__m256i_u*)&hT[idx])
   
     // Merge histograms using AVX2
     // 1. Sum by 256
@@ -155,7 +155,7 @@ namespace fast_histogram {
       }
       v0 = _mm256_add_epi32(v0, v1);
       _mm256_storeu_si256((__m256i_u*)&out[i], 
-        _mm256_add_epi32(_mm256_loadu_si256((__m256i_u*)&out[i]), v0));
+      _mm256_add_epi32(_mm256_loadu_si256((__m256i_u*)&out[i]), v0));
     }
   
     // 2. Horizontal sum by 256 element slices
@@ -180,5 +180,7 @@ namespace fast_histogram {
       out[buf[k]]++;
     }
   }
+
+#endif // __AVX2__
   
 } // namespace

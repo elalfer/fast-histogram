@@ -1,5 +1,5 @@
 # Artifact dirs
-./bin
+/bin
 
 # Prerequisites
 *.d
