@@ -59,13 +59,15 @@ static void BenchByteHistogramLong16(benchmark::State& state) {
     ByteHistogramLong<16>(h, dataBuf, SIZE);
   }
 }
-BENCHMARK(BenchByteHistogramLong16); //->Range(8, SIZE);
+
+BENCHMARK(BenchByteHistogramLong16); // ->RangeMultiplier(2)->Range(8, 1024);
 
 #endif // __AVX2__
 
 int main(int argc, char **argv) {
-  if (argc > 1) {
-    const auto fname = std::string{argv[1]};
+  
+  if (getenv("BENCHMARK_FILE")) {
+    const auto fname = std::string{getenv("BENCHMARK_FILE")};
     if (!std::filesystem::exists(fname)) {
       std::cerr << "ERROR: Input file does not exist\n";
       return 1;
