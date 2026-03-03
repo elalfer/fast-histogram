@@ -1,3 +1,25 @@
+/**
+ * @file fast_histogram.h
+ * @author Ilya Albrecht (ilya@alfs.me)
+ *
+ * @brief Implements various byte histogram algorithms.
+ *
+ * A byte histogram counts the frequency of each possible byte value (0–255)
+ * in a byte array. This file contains several baseline implementations
+ * that differ in memory layout, vectorisation, and blocking strategies.
+ * They serve both as reference and as building blocks for more advanced
+ * histogram kernels.
+ *
+ * The implementations are:
+ *   - ByteHistogram: naive scalar loop.
+ *   - ByteHistogramX4: uses 4 separate 256‑bucket buffers to reduce
+ *     contention on some microarchitectures.
+ *   - ByteHistogramX256: builds a 256×256 16‑bit intermediate table and
+ *     aggregates it with AVX2 if available.
+ *   - ByteHistogramLong: (template) an AVX2‑accelerated routine that
+ *     accumulates into a larger intermediate histogram before merging.
+ */
+
 #include <stdint.h>
 #include <string.h>
 #include <immintrin.h>
@@ -100,21 +122,32 @@ namespace fast_histogram {
           "  shrq $8, %%rcx\n\t" \
           "  addq $256, (%[out], %%rcx, 4)\n\t"
   
+#ifndef AVOID_RMW
+      // Use RMW operations for simplicity.
+      #define INC_BUCKET "  addb $1, (%[histo], %%rcx, 1)\n\t"
+#else
+      // Avoid RMW operations for better performance on some CPUs.
+      #define INC_BUCKET \
+        "  movb (%[histo], %%rcx, 1), %%al\n\t" \
+        "  addb $1, %%al\n\t" \
+        "  movb %%al, (%[histo], %%rcx, 1)\n\t"
+#endif
+
       asm volatile(
           "  movzwq (%[inp], %[i], 1), %%rcx\n\t"
-          "  addb $1, (%[histo], %%rcx, 1)\n\t"
+          INC_BUCKET
           "  jc flush_0\n\t"
           "inc_0:"
           "  movzwq 2(%[inp], %[i], 1), %%rcx\n\t"
-          "  addb $1, (%[histo], %%rcx, 1)\n\t"
+          INC_BUCKET
           "  jc flush_1\n\t"
           "inc_1:"
           "  movzwq 4(%[inp], %[i], 1), %%rcx\n\t"
-          "  addb $1, (%[histo], %%rcx, 1)\n\t"
+          INC_BUCKET
           "  jc flush_2\n\t"
           "inc_2:"
           "  movzwq 6(%[inp], %[i], 1), %%rcx\n\t"
-          "  addb $1, (%[histo], %%rcx, 1)\n\t"
+          INC_BUCKET
           "  jc flush_3\n\t"
           
           "jmp end_loop\n\t"
@@ -136,6 +169,9 @@ namespace fast_histogram {
           : [histo]"r"(hT), [out]"r"(out),
             [inp]"r"(buf), [i]"r"(k)
           : "rbx", "rcx"
+#ifdef AVOID_RMW
+            , "al"
+#endif
           );
     }
   
